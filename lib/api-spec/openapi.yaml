@@ -1,0 +1,462 @@
+openapi: 3.1.0
+info:
+  # Do not change the title, if the title changes, the import paths will be broken
+  title: Api
+  version: 0.1.0
+  description: GoodDollar Faucet API - Face verification, G$ token claiming, daily check-in streaks, and leaderboard on Celo
+servers:
+  - url: /api
+    description: Base API path
+tags:
+  - name: health
+    description: Health operations
+  - name: faucet
+    description: Faucet claim operations
+  - name: verification
+    description: GoodDollar face verification
+  - name: checkin
+    description: Daily check-in and streak system
+  - name: leaderboard
+    description: Streak leaderboard
+  - name: referral
+    description: Referral link system
+paths:
+  /healthz:
+    get:
+      operationId: healthCheck
+      tags: [health]
+      summary: Health check
+      responses:
+        "200":
+          description: Healthy
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthStatus"
+
+  /faucet/claim:
+    post:
+      operationId: claimTokens
+      tags: [faucet]
+      summary: Claim G$ tokens
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ClaimInput"
+      responses:
+        "200":
+          description: Tokens claimed successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ClaimResult"
+        "400":
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "409":
+          description: Already claimed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /faucet/status/{walletAddress}:
+    get:
+      operationId: getClaimStatus
+      tags: [faucet]
+      summary: Get claim status for a wallet
+      parameters:
+        - name: walletAddress
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Claim status
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ClaimStatus"
+
+  /faucet/stats:
+    get:
+      operationId: getFaucetStats
+      tags: [faucet]
+      summary: Get faucet statistics
+      responses:
+        "200":
+          description: Faucet statistics
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FaucetStats"
+
+  /faucet/recent:
+    get:
+      operationId: getRecentClaims
+      tags: [faucet]
+      summary: Get recent claims
+      responses:
+        "200":
+          description: Recent claims
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ClaimRecord"
+
+  /verification/check/{walletAddress}:
+    get:
+      operationId: checkVerificationStatus
+      tags: [verification]
+      summary: Check GoodDollar verification status
+      parameters:
+        - name: walletAddress
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Verification status
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/VerificationStatus"
+
+  /checkin:
+    post:
+      operationId: dailyCheckin
+      tags: [checkin]
+      summary: Perform daily check-in
+      description: Check in once per day to build streak and earn bonus G$
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CheckinInput"
+      responses:
+        "200":
+          description: Check-in successful
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CheckinResult"
+        "400":
+          description: Already checked in today or not verified
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /checkin/streak/{walletAddress}:
+    get:
+      operationId: getStreakStatus
+      tags: [checkin]
+      summary: Get streak status for a wallet
+      parameters:
+        - name: walletAddress
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Streak status
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StreakStatus"
+
+  /referral/{walletAddress}:
+    get:
+      operationId: getReferralStats
+      tags: [referral]
+      summary: Get referral stats and link for a wallet
+      parameters:
+        - name: walletAddress
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Referral stats
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReferralStats"
+
+  /referral/validate/{referralCode}:
+    get:
+      operationId: validateReferralCode
+      tags: [referral]
+      summary: Validate a referral code
+      parameters:
+        - name: referralCode
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Referral code is valid
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReferralValidation"
+
+  /leaderboard:
+    get:
+      operationId: getLeaderboard
+      tags: [leaderboard]
+      summary: Get streak leaderboard
+      description: Top wallets ranked by current streak
+      responses:
+        "200":
+          description: Leaderboard entries
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/LeaderboardEntry"
+
+components:
+  schemas:
+    HealthStatus:
+      type: object
+      properties:
+        status:
+          type: string
+      required: [status]
+
+    ClaimInput:
+      type: object
+      required: [walletAddress, verificationProof]
+      properties:
+        walletAddress:
+          type: string
+        verificationProof:
+          type: string
+        referralCode:
+          type: string
+          nullable: true
+
+    ClaimResult:
+      type: object
+      required: [success, txHash, amount, walletAddress, claimedAt]
+      properties:
+        success:
+          type: boolean
+        txHash:
+          type: string
+        amount:
+          type: string
+        walletAddress:
+          type: string
+        claimedAt:
+          type: string
+          format: date-time
+
+    ClaimStatus:
+      type: object
+      required: [walletAddress, hasClaimed, isVerified]
+      properties:
+        walletAddress:
+          type: string
+        hasClaimed:
+          type: boolean
+        isVerified:
+          type: boolean
+        claimedAt:
+          type: ["string", "null"]
+          format: date-time
+        txHash:
+          type: ["string", "null"]
+        amount:
+          type: ["string", "null"]
+
+    ClaimRecord:
+      type: object
+      required: [id, walletAddress, amount, txHash, claimedAt]
+      properties:
+        id:
+          type: integer
+        walletAddress:
+          type: string
+        amount:
+          type: string
+        txHash:
+          type: string
+        claimedAt:
+          type: string
+          format: date-time
+
+    FaucetStats:
+      type: object
+      required: [totalClaims, uniqueWallets, totalDistributed, claimsToday]
+      properties:
+        totalClaims:
+          type: integer
+        uniqueWallets:
+          type: integer
+        totalDistributed:
+          type: string
+        claimsToday:
+          type: integer
+
+    VerificationStatus:
+      type: object
+      required: [walletAddress, isVerified, verifiedAt]
+      properties:
+        walletAddress:
+          type: string
+        isVerified:
+          type: boolean
+        verifiedAt:
+          type: ["string", "null"]
+          format: date-time
+
+    CheckinInput:
+      type: object
+      required: [walletAddress]
+      properties:
+        walletAddress:
+          type: string
+
+    CheckinResult:
+      type: object
+      required: [success, currentStreak, bonusEarned, milestoneReached, nextMilestone, message]
+      properties:
+        success:
+          type: boolean
+        currentStreak:
+          type: integer
+        bonusEarned:
+          type: integer
+        milestoneReached:
+          type: boolean
+        milestoneName:
+          type: ["string", "null"]
+        nextMilestone:
+          type: integer
+        message:
+          type: string
+        totalBonusEarned:
+          type: integer
+
+    StreakStatus:
+      type: object
+      required: [walletAddress, currentStreak, longestStreak, totalCheckins, totalBonusEarned, canCheckinToday, nextMilestone, currentCycleDay, milestones]
+      properties:
+        walletAddress:
+          type: string
+        currentStreak:
+          type: integer
+        longestStreak:
+          type: integer
+        totalCheckins:
+          type: integer
+        totalBonusEarned:
+          type: integer
+        canCheckinToday:
+          type: boolean
+        lastCheckinAt:
+          type: ["string", "null"]
+          format: date-time
+        nextMilestone:
+          type: integer
+        currentCycleDay:
+          type: integer
+        milestones:
+          type: array
+          items:
+            $ref: "#/components/schemas/MilestoneInfo"
+
+    MilestoneInfo:
+      type: object
+      required: [day, bonus, label, reached]
+      properties:
+        day:
+          type: integer
+        bonus:
+          type: integer
+        label:
+          type: string
+        reached:
+          type: boolean
+
+    LeaderboardEntry:
+      type: object
+      required: [rank, walletAddress, currentStreak, longestStreak, totalCheckins, totalBonusEarned]
+      properties:
+        rank:
+          type: integer
+        walletAddress:
+          type: string
+        currentStreak:
+          type: integer
+        longestStreak:
+          type: integer
+        totalCheckins:
+          type: integer
+        totalBonusEarned:
+          type: integer
+
+    ReferralStats:
+      type: object
+      required: [walletAddress, referralCode, referralLink, totalReferrals, bonusEarned, referrals]
+      properties:
+        walletAddress:
+          type: string
+        referralCode:
+          type: string
+        referralLink:
+          type: string
+        totalReferrals:
+          type: integer
+        bonusEarned:
+          type: integer
+        referrals:
+          type: array
+          items:
+            $ref: "#/components/schemas/ReferralRecord"
+
+    ReferralRecord:
+      type: object
+      required: [referredWallet, bonusEarned, createdAt]
+      properties:
+        referredWallet:
+          type: string
+        bonusEarned:
+          type: integer
+        createdAt:
+          type: string
+          format: date-time
+
+    ReferralValidation:
+      type: object
+      required: [valid, referralCode, referrerWallet]
+      properties:
+        valid:
+          type: boolean
+        referralCode:
+          type: string
+        referrerWallet:
+          type: ["string", "null"]
+
+    ErrorResponse:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: string
